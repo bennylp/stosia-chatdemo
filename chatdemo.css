@@ -1,0 +1,191 @@
+.chat
+{
+	//font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+	//font-size: 16px;
+	font-size: 14px;
+	font-family: "Source Sans Pro";
+	//font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chat li
+{
+	//font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+	font-size: 14px;
+	font-family: "Source Sans Pro";
+	//font-size: 13px;
+	//font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 1px dotted #B3A9A9;
+}
+
+.mychatbox
+{
+	font-size: 16px;
+	font-family: "Source Sans Pro";
+	font-weight: 600;
+}
+
+/*
+.chat li.left .chat-body
+{
+    margin-left: 20px;
+}
+
+.chat li.right .chat-body
+{
+    margin-right: 0px;
+}
+*/
+
+.chat li.left 
+{
+    margin-left: 20px;
+    margin-right: 10px;
+}
+
+.chat li.right
+{
+	margin-left: 40px;
+    margin-right: 10px;
+    background-color: #f0fff0;
+}
+.chat li .chat-body p
+{
+    margin: 0;
+    //color: #777777;
+}
+
+.panel .slidedown .glyphicon, .chat .glyphicon
+{
+    margin-right: 5px;
+}
+
+.xxcol-md-6
+{
+	width: 441px;	// (480+108)*3/4
+}
+
+.panel-body
+{
+    overflow-y: scroll;
+    height: 480px;
+}
+
+::-webkit-scrollbar-track
+{
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+    background-color: #F5F5F5;
+}
+
+::-webkit-scrollbar
+{
+    width: 12px;
+    background-color: #F5F5F5;
+}
+
+::-webkit-scrollbar-thumb
+{
+    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
+    background-color: #555;
+}
+
+.redbold
+{
+	color: #ff0000;
+	font-weight: bold;
+}
+
+.newsitem
+{
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-size: 12px;
+	padding-bottom: 3px;
+}
+
+.newsdate
+{
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-size: 11px;
+	font-style: italic;
+}
+
+.news table
+{
+	border: none;
+	width: 100%;
+}
+
+.news td
+{
+	padding: 5px;
+}
+
+.bpadding5
+{
+	padding-bottom: 5px;
+}
+
+.tpadding5
+{
+	padding-top: 5px;
+}
+
+.stockpick table
+{
+	//border: none;
+	border-collapse: collapse;
+}
+
+.stockpick td
+{
+	padding: 5px;
+	//border-bottom: 1px solid #ddd;
+	border: 1px solid #ddd;
+	//min-width: 60px;
+}
+
+.stockpick th
+{
+	text-align: center;
+	font-weight: bold;
+	padding: 5px;
+	//border-bottom: 1px solid #ddd;
+	border: 1px solid #ddd;
+	background-color: #4CAF50;
+	color: white;
+}
+
+.stockpick tr:nth-child(even) 
+{
+	background-color: #e0ffe0;
+}
+
+.ticker
+{
+	font-weight: 600;
+	color: brown;
+}
+
+.chattitle
+{
+	//font-family: "Source Sans Pro", "Helvetica Neue";
+	font-family: Arial;
+	font-size: 16px;
+	font-weight: 600;
+	padding-bottom: 0px;
+	line-height: 95%;
+}
+
+.chatsubtitle
+{
+	font-family: Arial;
+	//font-family: "Source Sans Pro";
+	font-size: 12px;
+	font-weight: 400;
+	padding-top: 0px;
+	//line-height: 95%;
+}

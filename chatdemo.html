@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="Benny Prijono">
+    <title>Stosia - The Stock Assistant</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/simple-line-icons/2.4.1/css/simple-line-icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="chatdemo.css">
+    
+</head>
+
+<boDy id="page-top">
+
+<div class="container">
+    <div class="row">
+        <div class="xxcol-md-6">
+            <div class="panel panel-primary">
+                <div class="panel-heading">
+                	<table style="border: none;">
+                		<tr><td><img src="img/favicon64.png" width="32" height="32">&nbsp; &nbsp;</td>
+                			<td><div class="chattitle">Stosia</div>
+                				<div class="chatsubtitle">The virtual stock assistant</div></td>
+                		</tr>
+                	</table>
+                    <!-- 
+                    <div class="btn-group pull-right">
+                        <button type="button" class="btn btn-default btn-xs dropdown-toggle" data-toggle="dropdown">
+                            <span class="glyphicon glyphicon-chevron-down"></span>
+                        </button>
+                    </div>
+                     -->
+                </div>
+                <div class="panel-body" id="chatpanelbody">
+                    <ul class="chat" id="chatlist">
+                    </ul>
+                    <div id="endbody"></div>
+                </div>
+                <div class="panel-footer">
+                	<!-- 
+                    <div class="input-group inline">
+                        <input id="btn-input" type="text" class="form-control input-md mychatbox" placeholder="">
+                        <span class="input-group-btn">
+                            <button class="btn btn-warning btn-md" id="btn-chat" onclick="chat_send('');">Send</button>
+                        </span>
+                    </div>
+                    -->
+				<form id="mainfrm" class="form-horizontal" role="form">
+						<div class="form-inline text-center">
+							<label class="control-label sr-only" for="btn-input">Query:</label>
+							<i class="fa fa-smile-o fa-lg" aria-hidden="true"></i>
+							<input type="text" name="btn-input" id="btn-input" class="form-control mychatbox" value="" size="34">
+							<button class="btn btn-info btn-md form-control" id="btn-chat" onclick="chat_send('');">
+								<span class="glyphicon glyphicon-send" title="Send"></span>
+							</button>
+						</div>
+				</form>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    <div style="height: 20px;">
+    </div>
+    <div class="row">
+    	<form class="form-inline">
+    		<label class="checkbox-inline"><input type="checkbox" id="turbo" value="1" onclick="update_turbo()">Turbo</label>
+    		<button type="button" class="btn btn-success btn-md" onclick="start_demo();">Start</button>
+    		<button type="button" class="btn btn-danger btn-md" onclick="stop_demo();">Stop</button>
+    		<label for="chat_idx">Next #</label>
+    		<input class="form-control text-right" id="chat_idx" size="1">
+    		<button type="button" class="btn btn-warning btn-md" onclick="step_demo();">Step</button>
+    	</form>
+    </div>
+</div>
+
+<!-- jQuery -->
+<!-- <script src="/static/stosiateaser/vendor/jquery/jquery.min.js"></script> -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+
+<!-- Bootstrap Core JavaScript -->
+<!-- <script src="/static/stosiateaser/vendor/bootstrap/js/bootstrap.min.js"></script>  -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+<script>
+
+var TURBO = false;
+var SCROLL_DELAY = 50;
+var KEY_TYPE_DELAY = TURBO ? 0 : 80;
+
+function debug(msg)
+{
+	console.log(msg);
+}
+
+function chat_scroll()
+{
+	var e;
+	var id = "sentinel" + cur_id;
+	
+	// debug('scrollto ' + id)
+	e = document.getElementById(id);
+	e.scrollIntoView();
+}
+
+var id_counter = 100;
+
+function create_id()
+{
+	return id_counter++;
+}
+
+function chat_send(txt)
+{
+	if (txt.length==0) {
+		txt = document.getElementById("btn-input").value;
+	}
+	chat_add_question(txt);
+	document.getElementById("btn-input").value = '';
+}
+
+var chat_manual = true;	// Step by step manually
+var chat_idx = 0;	// Current chat index
+var cur_id = create_id();
+var cur_chat;		// Current chat object
+var chat_body;		// Current chat body
+var answer_typing_timer;
+var typing_timer;
+
+function chat_on_question_added()
+{
+	chat_scroll();
+	document.getElementById("btn-chat").focus();
+	setTimeout(run_chat, TURBO ? 0 : 100);
+}
+
+// Timer callback when we finished typing
+function chat_on_typing_done()
+{
+	document.getElementById('btn-input').value = '';
+	chat_add_question(chat_body);
+	setTimeout(chat_on_question_added, SCROLL_DELAY);
+}
+
+// Timer callback called to type a letter on the chatbox.
+// When the full text has been typed, it will be "sent" to the chat
+function chat_type_on_timer()
+{
+	document.getElementById("btn-input").focus();
+	var cur_len = document.getElementById('btn-input').value.length;
+	if (cur_len >= chat_body.length) {
+		clearInterval(typing_timer);
+		setTimeout(chat_on_typing_done, TURBO ? 0 : 500);
+		return;
+	}
+	
+	document.getElementById('btn-input').value = chat_body.substring(0, cur_len+1);
+}
+
+// Top-most function to type a query in the chatbox and send it to the chat
+function chat_type_question(txt)
+{
+	chat_body = txt;
+	document.getElementById('btn-input').value = '';
+	if (TURBO)
+		document.getElementById('btn-input').value = chat_body;
+	typing_timer = setInterval(chat_type_on_timer, KEY_TYPE_DELAY);
+}
+
+// Display the question
+function chat_add_question(html_body)
+{
+	var li_tmpl = ' <span class="chat-img pull-left">\
+			        	<span><img src="img/jacksparrow2.png" width="16" height="16"></span>\
+			        </span>\
+			        <div class="chat-body clearfix">\
+			                <div class="header">\
+			                    <strong class="primary-font"> &nbsp; You</strong> <small class="pull-right text-muted">\
+			                         &nbsp; </small>\
+			                </div>\
+			                <div id="$divid$">$content$</div>\
+			                <div id="$sentinel$"></div> \
+			        </div>\
+					';
+			        ;
+	var li_body = li_tmpl.replace("$divid$", "chatbody" + cur_id)
+						 .replace("$sentinel$", "sentinel" + cur_id)
+						 .replace('$content$', html_body);
+	var ul = document.getElementById("chatlist");
+	var li = document.createElement("li");
+	li.className = "left clearfix";
+	li.id = 'li' + cur_id;
+	li.innerHTML = li_body;
+	ul.appendChild(li);
+}
+
+// Timer callback called after answer is displayed to scroll the answer 
+function chat_on_answer_displayed()
+{
+	chat_scroll();
+	if (TURBO || cur_chat.flags.indexOf('pause') < 0) {
+		setTimeout(run_chat, TURBO ? 0 : 100);		
+	}
+}
+
+// Timer callback to simulate "typing" indication to indicate that the bot is thinking
+function chat_typing_answer()
+{
+	if (cur_chat.typing_count > 0) {
+		document.getElementById("chatbody" + cur_id).innerHTML += ".";
+	}
+	var cur_body = document.getElementById("chatbody" + cur_id).innerHTML;
+	if (cur_body.length >= cur_chat.typing_count) {
+		clearInterval(answer_typing_timer);
+		document.getElementById("chatbody" + cur_id).innerHTML = chat_body;
+		
+		var render_delay = SCROLL_DELAY;
+		if (cur_chat.hasOwnProperty('render_delay') && cur_chat.render_delay > 0)
+			render_delay += cur_chat.render_delay;
+		setTimeout(chat_on_answer_displayed, TURBO ? 0 : render_delay);
+	}
+}
+
+// Timer callback that is called right after typing indication for answer
+// is started
+function chat_on_start_typing_answer()
+{
+	chat_scroll();
+	answer_typing_timer = setInterval(chat_typing_answer, TURBO ? 0 : 500);
+}
+
+// Display bot's answer
+function chat_add_answer(html_body)
+{
+	var li_tmpl = ' <span class="chat-img pull-right"> \
+				        <span><img src="img/favicon64.png" width="16" height="16"></span> \
+				    </span> \
+				    <div class="chat-body clearfix"> \
+				            <div class="header"> \
+				                <small class=" text-muted"> &nbsp; </small> \
+				                <strong class="pull-right primary-font">Stosia &nbsp; </strong> \
+				            </div> \
+				            <div id="$divid$">.</div> \
+				            <div id="$sentinel$"></div> \
+				    </div> \
+				';
+
+	var li_body = li_tmpl.replace("$divid$", "chatbody" + cur_id).replace("$sentinel$", "sentinel" + cur_id);
+	
+	var ul = document.getElementById("chatlist");
+	var li = document.createElement("li");
+	li.className = "right clearfix";
+	li.id = 'li' + cur_id;
+	li.innerHTML = li_body;
+	ul.appendChild(li);
+	chat_body = html_body;
+	// Can't scroll chat immediately
+	if (cur_chat.typing_count != 0)
+		setTimeout(chat_on_start_typing_answer, SCROLL_DELAY);
+	else
+		setTimeout(chat_typing_answer, SCROLL_DELAY);
+}
+
+var DEFAULT_ANSWER_DELAY = TURBO ? 0 : 500;
+var DEFAULT_QUESTION_DELAY = TURBO ? 0 : 1500;
+
+// Chat object elements:
+//	role: 'l': left (you), 'r': right (the bot)
+//  body: HTML body of the chat
+//  delay: delay before the chat is invoked
+//  render_delay: additional delay after answer is displayed before scrolling
+//  typing_count: Number of dots to display before the actual
+//          answer is displayed. Only applies to bot answer.
+//  flags: combination of:
+//         - "pause": the next chat has to be started manually
+//		   - "notyping": for 'l', don't type question in chatbox
+var chats = [
+   	{ 'role': 'r',
+	  'delay': 200,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p>Good morning Benny <i class="fa fa-smile-o fa-lg" aria-hidden="true"></i></p>',
+	},
+	{ 'role': 'l', 
+	  'delay': 500,
+	  'flags': [],
+	  'body': 'Hello Stosia',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': [],
+	  'body': 'How is the market today?',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p><span class="ticker">IHSG</span> is down <span class="redbold">-2</span> \
+	  		   or <span class="redbold">-0.04%</span> with foreign investors booking Rp 9 bio\
+	  		   net buy so far. \
+	  		   <img src="img/ihsg.png" class="img-responsive">\
+	  		   </p>\
+	  		   <div class="btn-group bpadding5">\
+			       <button class="btn btn-info btn-xs disabled">1D</button>\
+			       <button class="btn btn-info btn-xs">1M</button>\
+			       <button class="btn btn-info btn-xs">3M</button>\
+			       <button class="btn btn-info btn-xs">6M</button>\
+			       <button class="btn btn-info btn-xs">YTD</button>\
+			       <button class="btn btn-info btn-xs">1Y</button>\
+			       <button class="btn btn-info btn-xs">3Y</button>\
+			       <button class="btn btn-info btn-xs">5Y</button>\
+		       </div>\
+	  		   <div class="btn-toolbar bpadding5">\
+			       <button class="btn btn-primary btn-xs">Foreign flow</button>\
+		       </div>\
+	  		   ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'regional?',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p>Regional is mixed:</p>\
+				<div class="bpadding5">\
+					<table class="stockpick">\
+						<tr><th>&nbsp;</th><th>Last</th><th>Change</th><th>%</th></tr>\
+						<tr><td><span class="ticker">IHSG</span></td><td class="text-right">5,291</td><td class="text-right"><font color="red">-2</font></td><td class="text-right"><font color="red">-0.04%</font></td></tr>\
+						<tr><td><span class="ticker">HSI</span></td><td class="text-right">22,891</td><td class="text-right"><font color="green">+62</font></td><td class="text-right"><font color="green">+0.27%</font></td></tr>\
+						<tr><td><span class="ticker">STI</span></td><td class="text-right">3,013</td><td class="text-right"><font color="red">-20</font></td><td class="text-right"><font color="red">-0.67%</font></td></tr>\
+						<tr><td><span class="ticker">KLSE</span></td><td class="text-right">1,678</td><td class="text-right"><font color="green">+0.28</font></td><td class="text-right"><font color="green">+0.02%</font></td></tr>\
+					</table>\
+				</div>\
+		       <button class="btn btn-primary btn-xs">SE Asia</button>\
+		       <button class="btn btn-primary btn-xs">S Asia</button>\
+		       <button class="btn btn-primary btn-xs">Europe</button>\
+		       <button class="btn btn-primary btn-xs">N America</button>\
+		       <button class="btn btn-primary btn-xs">S America</button>\
+		       ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'What is the best stock to buy?',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5">Based on your profile, I\'ve picked the following stocks for you:</p>\
+		  		<div class="bpadding5">\
+	  			<table class="stockpick">\
+	  				<tr><th>Code</th><th>Reason</th></tr>\
+	  				<tr><td class="ticker">BBRI</td><td>Good ROE. Best NIM among banks. MA5/20 golden cross with raising volume. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  				<tr><td class="ticker">AALI</td><td>Top value stock. MA5/20 golden cross yesterday. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  				<tr><td class="ticker">BBCA</td><td>Good ROE. MACD golden cross 2 hours ago. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  			</table>\
+	  			</div>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Alert on</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Set profile</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top technical picks</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top value picks</button>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'alert on new stock pick',
+	},
+	{ 'role': 'r', 
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p><strong>Done.</strong> Alert added when new stock is picked.</p>',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'set profile',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<h4>Investor Profile</h4>\
+	  			<p class="bpadding5">Your trading/investing profile is as follows:</p>\
+		  		<div class="bpadding5">\
+	  			<table class="stockpick">\
+	  				<tr><th>&nbsp;</th><th>Preference</th><th>&nbsp;</th></tr>\
+	  				<tr><td>Buy timing</td><td>Buy on weak </td><td><button class="btn btn-info btn-xs">edit</button></td></tr>\
+	  				<tr><td>Value or growth</td><td>Value </td><td><button class="btn btn-info btn-xs">edit</button></td></tr>\
+	  				<tr><td>Swing duration</td><td>3 months </td><td><button class="btn btn-info btn-xs">edit</button></td></tr>\
+	  			</table>\
+	  			</div>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'top technical',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5">Top <strong>Technical Picks</strong>:</p>\
+		  		<div class="bpadding5">\
+	  			<table class="stockpick">\
+	  				<tr><th>Code</th><th>Reason</th></tr>\
+	  				<tr><td class="ticker">BBRI</td><td>MA5/20 golden cross with raising volume. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  				<tr><td class="ticker">AALI</td><td>MA5/20 golden cross yesterday. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  				<tr><td class="ticker">BBCA</td><td>MACD golden cross 2 hours ago. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+	  			</table>\
+	  			</div>\
+				<button class="btn btn-primary btn-xs">More..</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top value picks</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top foreign picks</button>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'top value',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5">Top <strong>Value Investing</strong> picks:</p>\
+	  			<div class="bpadding5">\
+				<table class="stockpick">\
+					<tr><th>Code</th><th>Reason</th></tr>\
+					<tr><td class="ticker">LPKR</td><td>valued at 0.95x PBV,\
+			   		   represents -2.6 StdDev of average PBV for the last 3 years. \
+			   		   <button class="btn btn-info btn-xs" onclick="run_chat(true);">more..</button></td></tr>\
+				</table>\
+				</div>\
+				<button class="btn btn-primary btn-xs">More..</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top technical picks</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top foreign picks</button>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'top foreign',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5">Top <strong>Foreign Flow Analysis</strong> picks:</p>\
+		  		<div class="bpadding5">\
+				<table class="stockpick">\
+					<tr><th>Code</th><th>Reason</th></tr>\
+					<tr><td class="ticker">BBCA</td><td>Big accummulation. <button class="btn btn-info btn-xs">more..</button></td></tr>\
+				</table>\
+				</div>\
+				<button class="btn btn-primary btn-xs">More..</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top technical picks</button>\
+				<button class="btn btn-primary btn-xs" onclick="run_chat(true);">Top value picks</button>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'LPKR value investing',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> is interesting for value investing because the PBV now is at 0.95 \
+		       which represents -2.6 StdDev of average PBV for the last 3 years:<BR>\
+	           <img src="img/lpkr-pbv.png" class="img-responsive bpadding5">\
+	  		   <div class="btn-group bpadding5">\
+			       <button class="btn btn-info btn-xs disabled">3Y</button>\
+			       <button class="btn info btn-xs">5Y</button>\
+		       </div>\
+	  		   <div class="btn-toolbar bpadding5">\
+			       <button class="btn btn-primary btn-xs">PER</button>\
+			       <button class="btn btn-primary btn-xs">Income</button>\
+			       <button class="btn btn-primary btn-xs">Balance sheet</button>\
+		       </div>\
+		       ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'Compare PBV with the sector',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  /*
+	  'body': 'LPKR PBV comparison with the sector:<BR>\
+	 	   	   <img src="img/lpkr-pbv-sector.png" class="img-responsive bpadding5">\
+	 	   	   ',
+	  */
+	  'body': '<span class="ticker">LPKR</span> PBV comparison with the sector:<BR>\
+				<div class="bpadding5">\
+					<table class="stockpick">\
+						<tr><th>&nbsp;</th><th>PBV</th></tr>\
+						<tr><td>Industry</td><td class="text-right">1.0</td></tr>\
+						<tr><td>Sector</td><td class="text-right">1.20</td></tr>\
+						<tr><td><span class="ticker">LPKR</span></td><td class="text-right">0.95</td></tr>\
+						<tr><td><span class="ticker">CTRA</span></td><td class="text-right">2.24</td></tr>\
+						<tr><td><span class="ticker">BSDE</span></td><td class="text-right">1.67</td></tr>\
+						<tr><td><span class="ticker">APLN</span></td><td class="text-right">0.65</td></tr>\
+					</table>\
+				</div>\
+				',
+	  
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [''],
+	  'body': 'Compare PBV PER ROE with the sector',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> PBV PER ROE comparison with the sector:<BR>\
+				<div class="bpadding5">\
+					<table class="stockpick">\
+						<tr><th>&nbsp;</th><th>PBV</th><th>PER</th><th>ROE</th></tr>\
+						<tr><td>Industry</td><td class="text-right">1.0</td><td class="text-right">12.25</td><td class="text-right">8%</td></tr>\
+						<tr><td>Sector</td><td class="text-right">1.20</td><td class="text-right">14.28</td><td class="text-right">9%</td></tr>\
+						<tr><td><span class="ticker">LPKR</span></td><td class="text-right">0.95</td><td class="text-right">15.47</td><td class="text-right">6.1%</td></tr>\
+						<tr><td><span class="ticker">CTRA</span></td><td class="text-right">2.24</td><td class="text-right">23.86</td><td class="text-right">9.5%</td></tr>\
+						<tr><td><span class="ticker">BSDE</span></td><td class="text-right">1.67</td><td class="text-right">21.35</td><td class="text-right">7.9%</td></tr>\
+						<tr><td><span class="ticker">APLN</span></td><td class="text-right">0.65</td><td class="text-right">5.4</td><td class="text-right">12.1%</td></tr>\
+					</table>\
+				</div>\
+				',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'annual revenue',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> annual revenue:<BR>\
+	 	   	   <img src="img/wskt-income-annual.png" class="img-responsive bpadding5">\
+		       <div class="btn-toolbar">\
+		       	<div class="btn-group btn-group-xs bpadding5">\
+			       	<button class="btn btn-info">Quarterly</button>\
+			        <button class="btn btn-info disabled">Annually</button>\
+			    </div>\
+		       	<div class="btn-group btn-group-xs bpadding5">\
+			       	<button class="btn btn-info">Table</button>\
+			        <button class="btn btn-info disabled">Chart</button>\
+			    </div>\
+		       </div>\
+	  		  ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'as table',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> annual revenue:<BR>\
+				<div class="bpadding5">\
+					<table class="stockpick">\
+						<tr><th>&nbsp;</th><th>2016 (9M)</th><th>2015</th><th>2014</th><th>2013</th><th>2013</th></tr>\
+						<tr><td>Revenue (Rp bio)</td><td class="text-right">14,012</td><td class="text-right">14,200</td><td class="text-right">10,425</td><td class="text-right">9,750</td><td class="text-right">9,450</td></tr>\
+						<tr><td>Net income (Rp bio)</td><td class="text-right">1,120</td><td class="text-right">994</td><td class="text-right">390</td><td class="text-right">382</td><td class="text-right">283.5</td></tr>\
+						<tr><td>Net profit margin</td><td class="text-right">8%</td><td class="text-right">7%</td><td class="text-right">5%</td><td class="text-right">4%</td><td class="text-right">3%</td></tr>\
+					</table>\
+				</div>\
+		       <div class="btn-toolbar">\
+		       	<div class="btn-group btn-group-xs bpadding5">\
+			       	<button class="btn btn-info">Quarterly</button>\
+			        <button class="btn btn-info disabled">Annually</button>\
+			    </div>\
+		       	<div class="btn-group btn-group-xs bpadding5">\
+			       	<button class="btn btn-info disabled">Table</button>\
+			        <button class="btn btn-info">Chart</button>\
+			    </div>\
+		       </div>\
+	  		  ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'latest news',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'render_delay': 0,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> news:\
+	  			<table class="news">\
+		 	  	<tr>\
+		 	  		<td><img src="img/news-lpkr1.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">03 Jan (9 hours ago) - Kompas</span>\
+		 	  			<p class="newsitem">Lippo Karawaci complete the Lippo Mall Kuta, Siloam Hospital Labuan Bajo sale\
+		 	  			<button class="btn btn-default btn-xs">read</button></p>\
+	  					</td>\
+	  			</tr>\
+	  			<tr>\
+  					<td><img src="img/news-lpkr2.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">03 Jan (9 hours ago) - The Jakarta Globe</span>\
+		 	  			<p class="newsitem">REITS acquired 2 assets of Lippo Karawaci\
+		 	  			<button class="btn btn-default btn-xs">read</button></p>\
+		 	  			</td>\
+	  			</tr>\
+	  			<tr>\
+  					<td><img src="img/news-lpkr3.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">03 Jan (9 hours ago) - Detik Finance</span>\
+		 	  			<p class="newsitem">Lippo Karawaci Sees Profit Jump in 2016 After \
+		 	  			Wrapping Up Asset Sales to Singapore-Listed REITs\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+	  			<tr>\
+  					<td><img src="img/news-lpkr4.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">06 Dec 2016 (7 days ago) - Kontan</span>\
+		 	  			<p class="newsitem">Premier Insight: LMIRT will acquire Lippo Mall Kuta\
+		 	  			 <button class="btn btn-default btn-xs">read</button></p></td>\
+    			</tr>\
+	  			<tr>\
+					<td><img src="img/news-lpkr5.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">05 Dec 2016 (8 days ago) - Warta Ekonomi</span>\
+		 	  			<p class="newsitem">Lippo Karawaci Sees Profit Jump in 2016 After \
+		 	  			Wrapping Up Asset Sales to Singapore-Listed REITs\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+  			   </table>\
+		 	   <p>\
+		 	      <button class="btn btn-primary btn-xs">More +5</button>\
+		 	      <button class="btn btn-primary btn-xs">More +10</button>\
+		 	   </p>\
+	 	  ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'LPKR news about financial',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'render_delay': 0,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<span class="ticker">LPKR</span> news containing financial topic:\
+	  		   <table class="news">\
+	  			<tr>\
+					<td><img src="img/news-lpkr3.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">03 Jan (9 hours ago) - Detik Finance</span>\
+		 	  			<p class="newsitem">Lippo Karawaci Sees Profit Jump in 2016 After \
+		 	  			Wrapping Up Asset Sales to Singapore-Listed REITs\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+	  			<tr>\
+					<td><img src="img/news-lpkr3.jpg" width="75" height="auto"></td>\
+		 	  		<td><span class="newsdate">03 Jan (9 hours ago) - Detik Finance</span>\
+		 	  			<p class="newsitem">Lippo Karawaci Sees Profit Jump in 2016 After \
+		 	  			Wrapping Up Asset Sales to Singapore-Listed REITs\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+	  			<tr>\
+  					<td><img src="img/news-lpkr2.jpg" width="65" height="auto"></td>\
+		 	  		<td><span class="newsdate">04 Dec 2016 (9 days ago) - The Jakarta Globe</span>\
+		 	  			<p class="newsitem">Lippo Karawaci planning to build 10,000 units housing for middle class\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+	  			<tr>\
+  					<td><img src="img/news-lpkr4.jpg" width="65" height="auto"></td>\
+		 	  		<td><span class="newsdate">06 Nov 2016 (1 month 7 days ago) - Bloomberg</span>\
+		 	  			<p class="newsitem">LMIRT will acquire Lippo Mall Kuta\
+		 	  			 <button class="btn btn-default btn-xs">read</button></p></td>\
+    			</tr>\
+	  			<tr>\
+					<td><img src="img/news-lpkr5.jpg" width="65" height="auto"></td>\
+		 	  		<td><span class="newsdate">05 Nov 2016 (1 month 8 days ago) - Kontan</span>\
+		 	  			<p class="newsitem">Recurring Revenue Shields Lippo Karawaci From Weak Property Market\
+		 	  			<button class="btn btn-default btn-xs">read</button></p></td>\
+	  			</tr>\
+  			   </table>\
+		 	   <p>\
+		 	      <button class="btn btn-primary btn-xs">More +5</button>\
+		 	      <button class="btn btn-primary btn-xs">More +10</button>\
+		 	   </p>\
+	 	  ',
+	},
+	/*
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': "Okay that's good",
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<i class="fa fa-smile-o fa-lg" aria-hidden="true"></i>',
+	},
+	*/
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'Add LPKR to my watchlist',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p><strong>Done</strong>. <span class="ticker">LPKR</span> has been added to your watchlist.</p> \
+	  		   <p>You have <strong>9</strong> stocks in your watchlist.</p> \
+	  		   <button class="btn btn-primary btn-xs">See watchlists</button>',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': "Alert me when LPKR's PER goes below 10",
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p><strong>Done</strong>. Added alert when <span class="ticker">LPKR</span> PER&lt;10.</p> \
+		  	   <p>You have <strong>5</strong> alerts.</p> \
+	  		   <button class="btn btn-primary btn-xs">See alerts</button>',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'thanks',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p>No worries Benny <i class="fa fa-smile-o fa-lg" aria-hidden="true"></i></p>',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'what about waskita?',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5">Did you mean <strong>Waskita Karya (<span class="ticker">WSKT</span>)\
+	  		   </strong> or <strong>Waskita Beton Precast (<span class="ticker">WSBP</span>)</strong>?</p>\
+		       <button class="btn btn-primary btn-xs" onclick="run_chat(true)">Waskita Karya (WSKT)</button>\
+		       <button class="btn btn-primary btn-xs">Waskita Beton Precast (WSBP)</button>',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'WSKT',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5"><span class="ticker">WSKT</span> chart:<BR>\
+		       <img src="img/wskt-1m.png" height="300" width="345"></p>\
+		       <div class="btn-group btn-group-xs bpadding5">\
+		       	<button class="btn btn-info">1D</button>\
+		        <button class="btn btn-info">1W</button>\
+		        <button class="btn btn-info disabled">1M</button>\
+		        <button class="btn btn-info">3M</button>\
+		        <button class="btn btn-info">6M</button>\
+		        <button class="btn btn-info">YTD</button>\
+		        <button class="btn btn-info">1Y</button>\
+		        <button class="btn btn-info">3Y</button>\
+		        <button class="btn btn-info">5Y</button>\
+		       </div>\
+		      <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-primary btn-xs">Profile</button>\
+			      <button class="btn btn-primary btn-xs">Key stats</button>\
+			      <button class="btn btn-primary btn-xs" onclick="run_chat(true)">Balance sheet</button>\
+			      <button class="btn btn-primary btn-xs">Income</button>\
+			      <button class="btn btn-primary btn-xs">Profitability</button>\
+			  </div>\
+			  <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-primary btn-xs">Growth</button>\
+			      <button class="btn btn-primary btn-xs">News</button>\
+			  </div>\
+	  ',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'quarterly balance sheet',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5"><span class="ticker">WSKT</span> quarterly balance sheet:<BR>\
+		       <img src="img/wskt-balance-sheet.png" height="300" width="345"></p>\
+		      <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-info btn-xs disabled">Quarterly</button>\
+			      <button class="btn btn-info btn-xs">Annually</button>\
+			  </div>\
+		      <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-primary btn-xs">Profile</button>\
+			      <button class="btn btn-primary btn-xs">Key stats</button>\
+			      <button class="btn btn-primary btn-xs">Balance sheet</button>\
+			      <button class="btn btn-primary btn-xs" onclick="run_chat(true)">Income</button>\
+			      <button class="btn btn-primary btn-xs">Profitability</button>\
+			  </div>\
+	  		  ',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'income statement',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': ['pause'],
+	  'body': '<p class="bpadding5"><span class="ticker">WSKT</span> income statement:<BR>\
+		       <img src="img/wskt-income-q.png" width="345"></p>\
+		      <div class="btn-toolbar bpadding5">\
+		      	<div class="btn-group">\
+			      <button class="btn btn-info btn-xs disabled">Quarterly</button>\
+			      <button class="btn btn-info btn-xs" onclick="run_chat(true)">Annually</button>\
+			    </div>\
+		      	<div class="btn-group">\
+			      <button class="btn btn-primary btn-xs">Growth</button>\
+			    </div>\
+			  </div>\
+		      <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-primary btn-xs">Profile</button>\
+			      <button class="btn btn-primary btn-xs">Key stats</button>\
+			      <button class="btn btn-primary btn-xs">Balance sheet</button>\
+			      <button class="btn btn-primary btn-xs">Income</button>\
+			      <button class="btn btn-primary btn-xs">Profitability</button>\
+			  </div>\
+	  		  ',
+	},
+	{ 'role': 'l', 
+	  'delay': 100,
+	  'flags': ['notyping'],
+	  'body': 'income statement annual',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p class="bpadding5"><span class="ticker">WSKT</span> income statement:<BR>\
+		       <img src="img/wskt-income-annual.png" width="345"></p>\
+		      <div class="btn-toolbar bpadding5">\
+		      	<div class="btn-group">\
+			      <button class="btn btn-info btn-xs">Quarterly</button>\
+			      <button class="btn btn-info btn-xs disabled">Annually</button>\
+			    </div>\
+		      	<div class="btn-group">\
+			      <button class="btn btn-primary btn-xs">Growth</button>\
+			    </div>\
+			  </div>\
+		      <div class="btn-toolbar bpadding5">\
+			      <button class="btn btn-primary btn-xs">Profile</button>\
+			      <button class="btn btn-primary btn-xs">Key stats</button>\
+			      <button class="btn btn-primary btn-xs">Balance sheet</button>\
+			      <button class="btn btn-primary btn-xs">Income</button>\
+			      <button class="btn btn-primary btn-xs">Profitability</button>\
+			  </div>\
+	  		  ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'alert me on WSKT news',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p><strong>Done.</strong>\
+	  		   Added alert on <span class="ticker">WSKT</span> news.</p>\
+		  	   <p>You have <strong>6</strong> alerts.</p> \
+	  		   <button class="btn btn-primary btn-xs">See alerts</button>\
+	  		   ',
+	},
+	{ 'role': 'l', 
+	  'delay': DEFAULT_QUESTION_DELAY,
+	  'flags': [],
+	  'body': 'thanks',
+	},
+	{ 'role': 'r',
+	  'delay': DEFAULT_ANSWER_DELAY,
+	  'typing_count': 0,
+	  'flags': [],
+	  'body': '<p>No worries Benny <i class="fa fa-smile-o fa-lg" aria-hidden="true"></i></p>',
+	},
+];
+
+// Get and run the next chat item
+function run_chat(manual=false)
+{
+	if (chat_idx >= chats.length)
+		return;
+	
+	if (chat_manual && !manual)
+		return;
+	
+	cur_chat = chats[chat_idx];
+	if (!manual && cur_chat.hasOwnProperty('delay') && cur_chat.delay > 0) {
+		var delay = cur_chat.delay;
+		cur_chat.delay = 0;
+		setTimeout(run_chat, TURBO ? 0 : delay);
+		return;
+	}
+	chat_idx++;
+	cur_id = create_id();
+	if (cur_chat.role == 'l') {
+		if (cur_chat.flags.indexOf('notyping') >= 0) {
+			chat_add_question(cur_chat.body);
+			setTimeout(chat_on_question_added, TURBO ? 0 : 100);
+		} else
+			chat_type_question(cur_chat.body);
+	} else {
+		chat_add_answer(cur_chat.body);
+	}
+	update_idx();
+}
+
+// Start
+function start_demo()
+{
+	chat_idx = parseInt(document.getElementById("chat_idx").value);
+	debug("Starting from #" + chat_idx);
+	chat_manual = false;
+	run_chat();
+}
+
+// Stop demo
+function stop_demo()
+{
+	chat_manual = true;
+	debug("Stopping");
+}
+
+// Move 1 step
+function step_demo()
+{
+	chat_manual = true;
+	chat_idx = parseInt(document.getElementById("chat_idx").value);
+	debug("Stepping to #" + chat_idx);
+	run_chat(true);
+}
+
+// Update chat idx
+function update_idx()
+{
+	document.getElementById("chat_idx").value = chat_idx;
+}
+
+// Update turbo from checkbox
+function update_turbo()
+{
+	TURBO = document.getElementById("turbo").checked? true : false;
+	debug("Turbo: " + TURBO);
+}
+
+update_idx();
+
+//run_chat();
+
+</script>
+</bOdy>
+</html>
